@@ -38,7 +38,7 @@ boolean throttleWasOn = false;
 
 void throttleLoop() {
   // When the brake is on turn the throttle off. End of story.
-  if (digitalRead(brakePin == LOW)) {
+  if (digitalRead(brakePin)  == LOW) {
     throttleOff();
   } else {
     // See if the throttle pin is activated.
