@@ -12,13 +12,16 @@ int brakePin = 11;
 // Connect this to the button. The other side of the button should be ground.
 // Has internal 1.5k Ohm to 5v pullup resistor.
 int throttleButtonPin = 3;
+// LED for debugging if the throttle is on
+int throttleLED = 13;
 
 // The setup routine runs once when you press reset or the board starts.
 void setup() {
   Serial.begin(9600);
   pinMode(throttlePin, OUTPUT);
-  pinMode(brakePin, INPUT);
-  pinMode(throttleButtonPin, INPUT);
+  pinMode(throttleLED, OUTPUT);
+  pinMode(brakePin, INPUT_PULLUP);
+  pinMode(throttleButtonPin, INPUT_PULLUP);
   Serial.println("SETUP");
 }
 
@@ -27,6 +30,13 @@ void loop() {
   // I like to call loop functions on specific funtionality.
   throttleLoop();
 }
+
+
+// Store the last button state to debounce transitions
+int lastButtonState = LOW;
+// the last time the output pin was toggled
+long lastDebounceTime = 0;
+long debounceDelay = 50;
 
 // THROTTLE
 
@@ -51,19 +61,29 @@ void throttleLoop() {
     throttleOff();
   } else {
     // See if the throttle pin is activated.
-    if (digitalRead(throttleButtonPin) == LOW) {
-      throttleUp();
+    int reading = digitalRead(throttleButtonPin);
+    // If the switch changed, due to noise or pressing:
+    if (reading != lastButtonState) {
+      // reset the debouncing timer
+      lastDebounceTime = millis();
+      lastButtonState = reading;
     }
-    else {
-      throttleWasOn = false;
-      // Throttle pin off. Unless the ramp reached throttleMax turn the throttle off.
-      if (throttleOutput < throttleMax) {
-        throttleOff();
+
+    if ((millis() - lastDebounceTime) > debounceDelay) {
+      if (digitalRead(throttleButtonPin) == LOW) {
+        throttleUp();
+      }
+      else {
+        throttleWasOn = false;
+        // Throttle pin off. Unless the ramp reached throttleMax turn the throttle off.
+        if (throttleOutput < throttleMax) {
+          throttleOff();
+        }
       }
     }
   }
   // Delay is for debug.
-//  delay(30);
+  // delay(30);
 }
 
 void throttleUp() {
@@ -72,7 +92,7 @@ void throttleUp() {
     // With a new button push reset throttle position to the minimum.
     // On start begin where the controller will actually do something.
     if (!throttleWasOn || throttleOutput == 0) {
-      throttleOutput = throttleMin; 
+      throttleOutput = throttleMin;
       Serial.println("new throttle");
     }
     // Do not go beyond max.
@@ -86,12 +106,7 @@ void throttleUp() {
     }
     // Save time we updated throttle position.
     throttleLastUp = millis();
-  }
-}
-void throttleUpTest() {
-  if (throttleOutput < throttleMax) {
-    throttleOutput = throttleOutput + throttleIncrement;
-    analogWrite(throttlePin, throttleOutput);
+    digitalWrite(throttleLED, HIGH);
   }
 }
 
@@ -104,6 +119,6 @@ void throttleOff() {
     // Save that the throttle was off.
     throttleWasOn = false;
     Serial.println("BRAKE");
+    digitalWrite(throttleLED, LOW);
   }
 }
-
