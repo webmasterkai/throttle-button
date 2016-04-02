@@ -4,6 +4,9 @@
 // Also PCB LED. 5v max out. PWM ~1000 Hz.
 // Attached to a 10k Ohm resistor then 2uf cap. Other side of cap to negative.
 // digispark pin4 is also used by usb. Use pin 5 or 6 on the Uno.
+
+// NOTE: using 1k Ohm resistor with 22uf on my controller. Seems to vary based
+// on controller.
 int throttlePin = 6;
 
 // Connect this to the yellow wire coming out of the controller.
@@ -39,13 +42,15 @@ long lastDebounceTime = 0;
 long debounceDelay = 50;
 
 // THROTTLE
-
 int throttleOutput = 0; // off.
 int throttleRamp = 20; // ms
 
 // When does the controller start to respond to the throttle input voltage?
 // Remember, analogWrite values go from 0 to 255.
-byte throttleMin = 50; // around 1 volt.
+// Was having troubles with false positives, so introduce a slight buffer
+// between the minimum throttle value and the minimum throttle action
+byte throttleMin = 28; // where we start incrementing
+byte throttleAction = 50; // around 1 volt. No action until we reach this value
 byte throttleMax = 240; // around 4 volts.
 // How much we add each increment. 1 increment = 0.02v.
 byte throttleIncrement = 2;
@@ -76,7 +81,7 @@ void throttleLoop() {
       else {
         throttleWasOn = false;
         // Throttle pin off. Unless the ramp reached throttleMax turn the throttle off.
-        if (throttleOutput < throttleMax) {
+        if ((throttleOutput > throttleAction) && (throttleOutput < throttleMax)) {
           throttleOff();
         }
       }
@@ -99,7 +104,9 @@ void throttleUp() {
     if (throttleOutput != throttleMax) {
       // Increment one is an increase of +0.02v.
       throttleOutput = throttleOutput + throttleIncrement;
-      analogWrite(throttlePin, throttleOutput);
+      if (throttleOutput > throttleAction) {
+        analogWrite(throttlePin, throttleOutput);
+      }
       // Save that the throttle was on.
       throttleWasOn = true;
       Serial.println(throttleOutput);
